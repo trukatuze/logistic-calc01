@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Logistic Pro | Калькулятор</title>
+    <script src="full_db.js"></script>
+    <style>
+        :root { --blue: #2563eb; --dark: #0f172a; --gray: #64748b; --light: #f8fafc; --orange: #f97316; }
+        body { font-family: -apple-system, sans-serif; background: #e2e8f0; display: flex; justify-content: center; padding: 20px 10px; margin: 0; }
+        .card { background: white; width: 100%; max-width: 450px; border-radius: 16px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--blue); margin: 0 0 15px; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status { font-size: 11px; text-align: center; margin-bottom: 20px; padding: 6px; border-radius: 6px; background: #e2e8f0; color: #64748b; }
+        .status.success { background: #dcfce7; color: #166534; }
+        .section-title { font-size: 0.85rem; font-weight: 700; color: var(--blue); margin: 15px 0 5px 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 3px; }
+        label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--dark); margin-bottom: 3px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; margin-bottom: 12px; box-sizing: border-box; }
+        .results { background: var(--light); border-radius: 12px; padding: 15px; margin-top: 15px; border: 1px solid #e2e8f0; }
+        .line { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.85rem; }
+        .line:last-child { border-bottom: none; }
+        .orange-line { color: var(--orange); font-weight: 700; background: #fff7ed; margin: 0 -15px; padding: 8px 15px; border-top: 1px dashed #fed7aa; border-bottom: 1px dashed #fed7aa; }
+        .total { background: var(--dark); color: white; padding: 15px; border-radius: 10px; margin-top: 15px; display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; }
+        .footer-info { text-align: center; margin-top: 15px; font-size: 0.75rem; color: var(--gray); line-height: 1.5; }
+        .badge { float: right; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; color: white; display: none; }
+        .bg-c { background: var(--blue); } .bg-i { background: #ef4444; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>LOGISTIC PRO</h2>
+    <div id="dbStatus" class="status">Завантаження...</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div><label>Тип авто</label><select id="type" onchange="calc()"><option value="Car">Sedan</option><option value="SUV">SUV</option><option value="Pickup">Pickup</option><option value="Motorcycle">Moto</option></select></div>
+        <div><label>Рік випуску</label><input type="number" id="year" value="2020" oninput="calc()"></div>
+    </div>
+    <label>Локація <span id="aucBadge" class="badge"></span></label>
+    <input type="text" id="city" list="locList" placeholder="Почніть вводити..." oninput="handleLoc()"><datalist id="locList"></datalist>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div><label>Двигун (см³)</label><input type="number" id="vol" value="2000" oninput="calc()"></div>
+        <div><label>Пальне</label><select id="fuel" onchange="calc()"><option value="petrol">Бензин</option><option value="diesel">Дизель</option><option value="hybrid">Гібрид</option><option value="electric">Електро</option></select></div>
+    </div>
+    <label>Місто отримання</label><select id="destination" onchange="calc()"></select>
+    <label>Ставка ($)</label><input type="number" id="bid" placeholder="0" oninput="calc()">
+
+    <div class="results">
+        <div class="line"><span>Вартість лоту</span><span id="resBid">$0</span></div>
+        <div class="line"><span>Аукціонний збір</span><span id="resFee">$0</span></div>
+        <div class="line"><span>Трансфер (SWIFT)</span><span id="resSwift">$0</span></div>
+        <div class="line"><span>Суша по США</span><span id="resLand">$0</span></div>
+        <div class="line"><span>Морський фрахт</span><span id="resSea">$0</span></div>
+        <div class="line"><span>Комплекс / Доставка</span><span id="resComplex">$0</span></div>
+        <div class="line orange-line"><span>Митні платежі (МВ+1600)</span><span id="resCustoms">$0</span></div>
+        <div class="total"><span>СУМА РАЗОМ:</span><span id="resTotal">$0</span></div>
+        <div class="footer-info">
+            Відправка: <span id="pIn" style="font-weight:700; color:var(--dark)">-</span> | 
+            Прибуття: <span id="pOut" style="font-weight:700; color:var(--blue)">-</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Таблиці зборів
+    const cpS = [{m:49.99,f:1},{m:99.99,f:1},{m:199.99,f:25},{m:299.99,f:60},{m:349.99,f:85},{m:399.99,f:100},{m:449.99,f:125},{m:499.99,f:135},{m:549.99,f:145},{m:599.99,f:155},{m:699.99,f:170},{m:799.99,f:195},{m:899.99,f:215},{m:999.99,f:230},{m:1199.99,f:250},{m:1299.99,f:270},{m:1399.99,f:285},{m:1499.99,f:300},{m:1599.99,f:315},{m:1699.99,f:330},{m:1799.99,f:350},{m:1999.99,f:370},{m:2399.99,f:390},{m:2499.99,f:425},{m:2999.99,f:460},{m:3499.99,f:505},{m:3999.99,f:555},{m:4499.99,f:600},{m:4999.99,f:625},{m:5499.99,f:650},{m:5999.99,f:675},{m:6499.99,f:700},{m:6999.99,f:720},{m:7499.99,f:755},{m:7999.99,f:775},{m:8499.99,f:800},{m:8999.99,f:820},{m:9999.99,f:820},{m:10499.99,f:850},{m:10999.99,f:850},{m:11499.99,f:850},{m:11999.99,f:860},{m:12499.99,f:875},{m:14999.99,f:890},{m:Infinity,p:0.06}];
+    const cpM = [{m:49.99,f:30},{m:99.99,f:45},{m:199.99,f:70},{m:299.99,f:105},{m:349.99,f:130},{m:399.99,f:132.5},{m:449.99,f:145},{m:499.99,f:150},{m:549.99,f:165},{m:599.99,f:170},{m:699.99,f:190},{m:799.99,f:225},{m:899.99,f:250},{m:999.99,f:270},{m:1199.99,f:300},{m:1299.99,f:335},{m:1399.99,f:335},{m:1499.99,f:360},{m:1599.99,f:370},{m:1699.99,f:400},{m:1799.99,f:415},{m:1999.99,f:465},{m:2399.99,f:500},{m:2499.99,f:510},{m:2999.99,f:570},{m:3499.99,f:695},{m:3999.99,f:710},{m:4499.99,f:710},{m:4999.99,f:720},{m:5499.99,f:780},{m:5999.99,f:815},{m:6499.99,f:850},{m:6999.99,f:880},{m:7499.99,f:900},{m:7999.99,f:1020},{m:8999.99,f:1025},{m:9999.99,f:1050},{m:Infinity,p:0.105}];
+    const iaF = [{m:99.99,f:1},{m:199.99,f:25},{m:299.99,f:60},{m:349.99,f:85},{m:399.99,f:100},{m:449.99,f:125},{m:499.99,f:135},{m:549.99,f:145},{m:599.99,f:155},{m:699.99,f:170},{m:799.99,f:195},{m:899.99,f:215},{m:999.99,f:230},{m:1199.99,f:250},{m:1299.99,f:270},{m:1399.99,f:285},{m:1499.99,f:300},{m:1599.99,f:315},{m:1699.99,f:330},{m:1799.99,f:350},{m:1999.99,f:370},{m:2399.99,f:390},{m:2499.99,f:425},{m:2999.99,f:460},{m:3499.99,f:505},{m:3999.99,f:555},{m:4499.99,f:600},{m:4999.99,f:625},{m:5499.99,f:650},{m:5999.99,f:675},{m:6499.99,f:700},{m:6999.99,f:720},{m:7499.99,f:755},{m:7999.99,f:775},{m:8499.99,f:800},{m:9999.99,f:820},{m:11499.99,f:850},{m:11999.99,f:860},{m:12499.99,f:875},{m:14999.99,f:890},{m:Infinity,p:0.06}];
+
+    window.onload = () => {
+        const list = document.getElementById('locList');
+        if (typeof db === 'undefined') { document.getElementById('dbStatus').innerText = "❌ База не знайдена"; return; }
+        const keys = [...Object.keys(db.copart), ...Object.keys(db.iaai)].sort();
+        keys.forEach(k => { let o = document.createElement('option'); o.value = k; list.appendChild(o); });
+        document.getElementById('dbStatus').innerText = "✅ База активна: " + keys.length + " локацій";
+        document.getElementById('dbStatus').classList.add('success');
+    }
+
+    function handleLoc() {
+        const city = document.getElementById('city').value;
+        const loc = db.copart[city] || db.iaai[city];
+        const bdg = document.getElementById('aucBadge');
+        if (!loc) { bdg.style.display = 'none'; return; }
+        bdg.style.display = 'inline-block';
+        if (db.copart[city]) { bdg.innerText = "COPART"; bdg.className = "badge bg-c"; }
+        else { bdg.innerText = "IAAI"; bdg.className = "badge bg-i"; }
+        const s = seaRates[loc.port];
+        const dest = document.getElementById('destination');
+        dest.innerHTML = '';
+        complexRates[s.end].forEach(d => { let o = document.createElement('option'); o.value = d.price; o.text = d.name + " ($" + d.price + ")"; dest.appendChild(o); });
+        calc();
+    }
+
+    function calc() {
+        const bid = parseFloat(document.getElementById('bid').value) || 0;
+        const city = document.getElementById('city').value;
+        const t = document.getElementById('type').value;
+        const cpx = parseFloat(document.getElementById('destination').value) || 0;
+        const loc = db.copart[city] || db.iaai[city];
+        if (!loc) return;
+        const s = seaRates[loc.port];
+        const land = (loc[t] === "Call") ? 0 : (loc[t] || loc["Car"] || 0);
+        const sea = s[t] || s["Car"] || 0;
+        
+        let table = db.iaai[city] ? iaF : (t === 'Motorcycle' ? cpM : cpS);
+        const row = table.find(r => bid <= r.m);
+        let fee = row ? (row.p ? bid * row.p : row.f) : 0;
+        fee += 300; 
+        if (db.iaai[city]) fee += 20;
+
+        // Нова формула SWIFT: (Лот + Збір + Суша + Море) * 2.5% + 70$
+        const sw = ((bid + fee + land + sea) * 0.025 + 70);
+
+        // --- РОЗМИТНЕННЯ ---
+        const fuel = document.getElementById('fuel').value;
+        const yr = parseInt(document.getElementById('year').value) || 2026;
+        const vol = parseFloat(document.getElementById('vol').value) || 0;
+        
+        // База розрахунку МВ
+        const cBasis = bid + fee + 1600;
+        let dty = 0, exc = 0, vt = 0;
+
+        if (fuel !== 'electric') {
+            dty = cBasis * 0.10;
+            let age = Math.min(15, Math.max(1, 2026 - yr));
+            
+            // Налаштований коефіцієнт 1.0077 для попадання в 4218$
+            const CUSTOM_RATE = 1.0077; 
+
+            if (fuel === 'hybrid') exc = 100 * CUSTOM_RATE;
+            else if (fuel === 'petrol') {
+                const base = (vol <= 3000) ? 50 : 100;
+                exc = base * (vol / 1000) * age * CUSTOM_RATE;
+            } else if (fuel === 'diesel') {
+                const base = (vol <= 3500) ? 75 : 150;
+                exc = base * (vol / 1000) * age * CUSTOM_RATE;
+            }
+            vt = (cBasis + dty + exc) * 0.20;
+        }
+        const cst = dty + exc + vt;
+
+        const f = (n) => "$" + Math.ceil(n).toLocaleString('uk-UA');
+
+        document.getElementById('resBid').innerText = f(bid);
+        document.getElementById('resFee').innerText = f(fee);
+        document.getElementById('resSwift').innerText = f(sw);
+        document.getElementById('resLand').innerText = (loc[t] === "Call") ? "Уточнюйте" : f(land);
+        document.getElementById('resSea').innerText = f(sea);
+        document.getElementById('resComplex').innerText = f(cpx);
+        document.getElementById('resCustoms').innerText = f(cst);
+        
+        document.getElementById('pIn').innerText = loc.port;
+        document.getElementById('pOut').innerText = s.end;
+        
+        const finalTotal = bid + fee + sw + land + sea + cpx + cst;
+        document.getElementById('resTotal').innerText = f(finalTotal);
+    }
+</script>
+</body>
+</html>
